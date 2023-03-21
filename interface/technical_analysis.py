@@ -7,6 +7,9 @@ class TechnicalAnalyst():
     def __init__(self) -> None:
         pass
 
+    def set_stop_loss(self):
+        pass
+
     def get_simple_moving_average(self, df, column='close', time_period=100):
         return ta.SMA(df[column], time_period).tolist()
     
@@ -21,6 +24,18 @@ class TechnicalAnalyst():
 
     def get_stochastic_oscillator(self, df, k=5, d=15):
         return ta.STOCH(df['high'], df['low'], df['close'], fastk_period=k, slowk_period=d, slowk_matype=ta.MA_Type.SMA, slowd_period=d, slowd_matype=ta.MA_Type.SMA)
+
+    def get_williams_oscillator(self, df, timeperiod=14):
+        return ta.WILLR(df['high'], df['low'], df['close'], timeperiod=timeperiod)
+
+    def get_average_directional_index(self, df, timeperiod=14):
+        return ta.ADX(df['high'], df['low'], df['close'], timeperiod=timeperiod)
+    
+    def get_directional_movement_index(self, df, timeperiod=14):
+        return ta.PLUS_DI(df['high'], df['low'], df['close'], timeperiod=timeperiod), ta.MINUS_DI(df['high'], df['low'], df['close'], timeperiod=timeperiod)
+
+    def get_stop_and_reverse(self, df):
+        return ta.SAR(df['high'], df['low'])
 
     def get_RSI_sell_buy_signals(self, data):
         area = []
@@ -70,6 +85,21 @@ class TechnicalAnalyst():
                 signals.append(0)
         return signals
     
+    def get_WO_sell_buy_signals(self, data):
+        area = []
+        signals = []
+        for idx, i in enumerate(data):
+            area.append('down' if i < -80 else 'top' if i > -20 else 'middle')
+            last = next(filter(lambda x: x != 0, reversed(signals)), 0)
+
+            if area[idx-1] == 'down' and area[idx] == 'middle' and last != 1:
+                signals.append(1)
+            elif area[idx-1] == 'top' and area[idx] == 'middle' and last != 2:
+                signals.append(2)
+            else:
+                signals.append(0)
+        return signals
+    
     def get_SO_sell_buy_signals(self, k, d):
         area = []
         signals = []
@@ -77,12 +107,26 @@ class TechnicalAnalyst():
             area.append('down' if i <= j else 'top')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
-            if i < 30 and j < 30:
-                print(i,j)
-
-            if i < 30 and j < 30 and area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
+            if i < 20 and j < 20 and area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
                 signals.append(1)
-            elif i > 70 and j > 70 and area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
+            elif i > 80 and j > 80 and area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
+                signals.append(2)
+            else:
+                signals.append(0)
+
+        return signals
+
+    def get_SAR_sell_buy_signals(self, real_prices, sar, plus_di, minus_di, adx):
+        real_prices = real_prices['close'].tolist()
+        area = []
+        signals = []
+        for idx, (i, j, p, m, a) in enumerate(zip(real_prices, sar, plus_di, minus_di, adx)):
+            area.append('down' if i <= j else 'top')
+            last = next(filter(lambda x: x != 0, reversed(signals)), 0)
+
+            if area[idx-1] == 'down' and area[idx] == 'top' and last != 1 and a > 40:   # a to też dodatkowy feature
+                signals.append(1)
+            elif area[idx-1] == 'top' and area[idx] == 'down' and last != 2 and p < m and a > 40:  # to jest dodatkowy feature and p < m
                 signals.append(2)
             else:
                 signals.append(0)
@@ -109,7 +153,9 @@ class TechnicalAnalyst():
             cash_before = cash
             amount = 0
 
-        print(f'final result ({name}): {np.round(cash,2)}$ ({np.round(((cash/initial_cash)-1)*100, 2)}%)')
+        number_of_transactions = sum(1 if i != 0 else 0 for i in signals)
+        score = np.round(((cash/initial_cash)-1)*100, 2)
+        print(f'final result ({name}): {np.round(cash,2)}$ ({"+" if score > 0 else ""}{score}%) (number of transactions: {number_of_transactions})')
 
     def draw_price_chart(self, df, signals, column='close'):
         data = df[column].tolist()
