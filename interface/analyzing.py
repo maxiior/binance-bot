@@ -1,5 +1,4 @@
 import numpy as np
-import numpy as np
 from scipy.signal import argrelextrema
 import time
 from win10toast import ToastNotifier

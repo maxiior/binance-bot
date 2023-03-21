@@ -1,20 +1,31 @@
 import pandas as pd
 import datetime
 from binance.exceptions import BinanceAPIException
+import logging
 
 class API():
     def __init__(self, client):
         self.client = client
+        self.logger = logging.getLogger(__name__)
+        logging.basicConfig(filename='info.txt',
+                    filemode='a',
+                    format='%(asctime)s %(name)s %(levelname)s %(message)s',
+                    datefmt='%H:%M:%S',
+                    level=logging.INFO)
     
     def get_all_tickers(self):
-        tickets = self.client.get_all_tickers()
-        df = pd.DataFrame(tickets)
-        return df.set_index('symbol')
+        try:
+            tickers = self.client.get_all_tickers()
+            return pd.DataFrame(tickers).set_index('symbol')
+        except:
+            self.logger.info("fetching all tickers failed")
+            return None
     
     def get_price(self, symbol):
         try:
             return float(self.get_all_tickers().loc[symbol]['price'])
         except:
+            self.logger.info("fetching price failed")
             return None
     
     def get_order_book(self, symbol, type):

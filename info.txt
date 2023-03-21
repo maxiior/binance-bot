@@ -1,0 +1,2 @@
+20:36:03,579 interface.api INFO Coœ posz³o nie tak
+20:37:54 interface.api INFO Coœ posz³o nie tak

@@ -4,14 +4,20 @@ import pandas as pd
 from interface.api import API
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager
 
+from interface.technical_analysis import TechnicalAnalyst
+
 import os
 import sys
 import subprocess
-import mplfinance as mpf
 from interface.analyzing import Analizer
+import matplotlib.pyplot as plt
+
+load_dotenv()
+API_KEY = os.getenv("API_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY")
 
 
-def running_in_background():
+def run_in_background():
     si = subprocess.STARTUPINFO()
     si.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     exe = os.path.abspath(sys.executable)
@@ -19,17 +25,34 @@ def running_in_background():
     subprocess.Popen([exe] + args, startupinfo=si)
 
 if __name__ == '__main__':
-    # running_in_background()
-    load_dotenv()
-
-    API_KEY = os.getenv("API_KEY")
-    SECRET_KEY = os.getenv("SECRET_KEY")
+    # run_in_background()    
     client = Client(API_KEY, SECRET_KEY)
 
     api = API(client)
     analizer = Analizer(api)
+    tm = TechnicalAnalyst()
 
-    # r.get_price('BTCUSDT')
+    data = api.get_historical_klines("BTCBUSD", client.KLINE_INTERVAL_1DAY, days=3000)
+    
+    rsi = tm.get_relative_strength_index(data)
+    rsi_signals = tm.get_RSI_sell_buy_signals(rsi)
+
+    roc = tm.get_rate_of_change(data)
+    roc_signals = tm.get_ROC_sell_buy_signals(roc)
+
+    cci = tm.get_commodity_channel_index(data)
+    cci_signals = tm.get_CCI_sell_buy_signals(cci)
+
+    k, d = tm.get_stochastic_oscillator(data)
+    so_signals = tm.get_SO_sell_buy_signals(k, d)
+    
+    tm.calculate_profit(data, rsi_signals, name='RSI')
+    tm.calculate_profit(data, roc_signals, name='ROC')
+    tm.calculate_profit(data, cci_signals, name='CCI')
+    tm.calculate_profit(data, so_signals, name='SO')
+    # tm.draw_price_chart(data, roc_signals)
+
+    exit()
     # r.get_order_book('GNSUSDT', type='bids')
 
     klines = api.get_historical_klines('HFTBUSD', client.KLINE_INTERVAL_1HOUR, days=7)
@@ -59,6 +82,3 @@ if __name__ == '__main__':
     for x, y in zip(extremes,values):
         plt.scatter(x, y, color='red')
     plt.show()
-
-
-    # mpf.plot(klines.set_index('close time'))
