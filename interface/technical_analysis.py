@@ -4,11 +4,14 @@ import math
 import numpy as np
 
 class TechnicalAnalyst():
-    def __init__(self) -> None:
+    def __init__(self):
         pass
 
-    def set_stop_loss(self):
-        pass
+    def check_if_exceeded_stop_loss(self, price, bought_for, threshold=0.03):
+        if price < bought_for*(1.00-threshold):
+            return True
+        else:
+            return False
 
     def get_simple_moving_average(self, df, column='close', time_period=100):
         return ta.SMA(df[column], time_period).tolist()
@@ -37,7 +40,14 @@ class TechnicalAnalyst():
     def get_stop_and_reverse(self, df):
         return ta.SAR(df['high'], df['low'])
 
-    def get_RSI_sell_buy_signals(self, data):
+    def get_moving_average_crossover(self, df, column='close', timeperiod1=5, timeperiod2=20):
+        return ta.MA(df[column], timeperiod=timeperiod1), ta.MA(df[column], timeperiod=timeperiod2)
+
+    def get_moving_average_convergence_divergence(self, df, column='close', fastperiod=12, slowperiod=26, signalperiod=9):
+        return ta.MACD(df[column], fastperiod=fastperiod, slowperiod=slowperiod, signalperiod=signalperiod)
+
+    def get_RSI_sell_buy_signals(self, data, stoploss=False, threshold=0.03):
+        bought_for = 0
         area = []
         signals = []
 
@@ -47,14 +57,19 @@ class TechnicalAnalyst():
 
             if area[idx-1] == 'down' and area[idx] == 'middle' and last != 1:
                 signals.append(1)
+                bought_for = i
             elif area[idx-1] == 'top' and area[idx] == 'middle' and last != 2:
                 signals.append(2)
             else:
-                signals.append(0)
+                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                    signals.append(2)
+                else:
+                    signals.append(0)
 
         return signals
     
-    def get_ROC_sell_buy_signals(self, data):
+    def get_ROC_sell_buy_signals(self, data, stoploss=False, threshold=0.03):
+        bought_for = 0
         area = []
         signals = []
         for idx, i in enumerate(data):
@@ -63,14 +78,40 @@ class TechnicalAnalyst():
 
             if area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
                 signals.append(1)
+                bought_for = i
             elif area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
                 signals.append(2)
             else:
-                signals.append(0)
+                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                    signals.append(2)
+                else:
+                    signals.append(0)
 
         return signals
     
-    def get_CCI_sell_buy_signals(self, data):
+    def get_MAC_sell_buy_signals(self, ma1, ma2, stoploss=False, threshold=0.03):
+        bought_for = 0
+        area = []
+        signals = []
+        for idx, (i, j) in enumerate(zip(ma1, ma2)):
+            area.append('down' if i < j else 'top')
+            last = next(filter(lambda x: x != 0, reversed(signals)), 0)
+
+            if area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
+                signals.append(1)
+                bought_for = i
+            elif area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
+                signals.append(2)
+            else:
+                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                    signals.append(2)
+                else:
+                    signals.append(0)
+
+        return signals
+    
+    def get_CCI_sell_buy_signals(self, data, stoploss=False, threshold=0.03):
+        bought_for = 0
         area = []
         signals = []
         for idx, i in enumerate(data):
@@ -79,13 +120,18 @@ class TechnicalAnalyst():
 
             if area[idx-1] == 'middle' and area[idx] == 'top' and last != 1:
                 signals.append(1)
+                bought_for = i
             elif area[idx-1] == 'middle' and area[idx] == 'down' and last != 2:
                 signals.append(2)
             else:
-                signals.append(0)
+                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                    signals.append(2)
+                else:
+                    signals.append(0)
         return signals
     
-    def get_WO_sell_buy_signals(self, data):
+    def get_WO_sell_buy_signals(self, data, stoploss=False, threshold=0.03):
+        bought_for = 0
         area = []
         signals = []
         for idx, i in enumerate(data):
@@ -94,13 +140,18 @@ class TechnicalAnalyst():
 
             if area[idx-1] == 'down' and area[idx] == 'middle' and last != 1:
                 signals.append(1)
+                bought_for = i
             elif area[idx-1] == 'top' and area[idx] == 'middle' and last != 2:
                 signals.append(2)
             else:
-                signals.append(0)
+                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                    signals.append(2)
+                else:
+                    signals.append(0)
         return signals
     
-    def get_SO_sell_buy_signals(self, k, d):
+    def get_SO_sell_buy_signals(self, k, d, stoploss=False, threshold=0.03):
+        bought_for = 0
         area = []
         signals = []
         for idx, (i, j) in enumerate(zip(k, d)):
@@ -109,27 +160,40 @@ class TechnicalAnalyst():
 
             if i < 20 and j < 20 and area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
                 signals.append(1)
+                bought_for = i
             elif i > 80 and j > 80 and area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
                 signals.append(2)
             else:
-                signals.append(0)
+                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                    signals.append(2)
+                else:
+                    signals.append(0)
 
         return signals
 
-    def get_SAR_sell_buy_signals(self, real_prices, sar, plus_di, minus_di, adx):
-        real_prices = real_prices['close'].tolist()
+    def get_SAR_sell_buy_signals(self, data, stoploss=False, threshold=0.03):
+        adx = self.get_average_directional_index(data)
+        plus_di, minus_di = self.get_directional_movement_index(data)
+        sar = self.get_stop_and_reverse(data)
+
+        bought_for = 0
+        data = data['close'].tolist()
         area = []
         signals = []
-        for idx, (i, j, p, m, a) in enumerate(zip(real_prices, sar, plus_di, minus_di, adx)):
+        for idx, (i, j, p, m, a) in enumerate(zip(data, sar, plus_di, minus_di, adx)):
             area.append('down' if i <= j else 'top')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'down' and area[idx] == 'top' and last != 1 and a > 40:   # a to też dodatkowy feature
                 signals.append(1)
+                bought_for = i
             elif area[idx-1] == 'top' and area[idx] == 'down' and last != 2 and p < m and a > 40:  # to jest dodatkowy feature and p < m
                 signals.append(2)
             else:
-                signals.append(0)
+                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                    signals.append(2)
+                else:
+                    signals.append(0)
 
         return signals
 
@@ -155,7 +219,8 @@ class TechnicalAnalyst():
 
         number_of_transactions = sum(1 if i != 0 else 0 for i in signals)
         score = np.round(((cash/initial_cash)-1)*100, 2)
-        print(f'final result ({name}): {np.round(cash,2)}$ ({"+" if score > 0 else ""}{score}%) (number of transactions: {number_of_transactions})')
+
+        return name, np.round(cash,2), np.round(score,2), number_of_transactions, np.round(cash/number_of_transactions,2) if number_of_transactions > 0 else 0
 
     def draw_price_chart(self, df, signals, column='close'):
         data = df[column].tolist()

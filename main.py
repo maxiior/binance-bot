@@ -50,11 +50,16 @@ if __name__ == '__main__':
     wo = tm.get_williams_oscillator(data)
     wo_signals = tm.get_WO_sell_buy_signals(wo)
 
-    adx = tm.get_average_directional_index(data)
-    plus_di, minus_di = tm.get_directional_movement_index(data)
-    sar = tm.get_stop_and_reverse(data)
+    sar_signals = tm.get_SAR_sell_buy_signals(data)
 
-    sar_signals = tm.get_SAR_sell_buy_signals(data, sar, plus_di, minus_di, adx)
+    ma1, ma2 = tm.get_moving_average_crossover(data)
+    mac5_20_signals = tm.get_MAC_sell_buy_signals(ma1, ma2)
+
+    ma1, ma2 = tm.get_moving_average_crossover(data, timeperiod1=10, timeperiod2=50)
+    mac10_50_signals = tm.get_MAC_sell_buy_signals(ma1, ma2)
+
+    macd, macd_signal, _ = tm.get_moving_average_convergence_divergence(data)
+    macd_signals = tm.get_MAC_sell_buy_signals(macd, macd_signal)
 
     # plt.plot(adx)
     # plt.axhline(y=25)
@@ -74,6 +79,9 @@ if __name__ == '__main__':
     tm.calculate_profit(data, so_signals, name='SO')
     tm.calculate_profit(data, wo_signals, name='WO')
     tm.calculate_profit(data, sar_signals, name='SAR')
+    tm.calculate_profit(data, mac5_20_signals, name='MAC_5_20')
+    tm.calculate_profit(data, mac10_50_signals, name='MAC_10_50')
+    tm.calculate_profit(data, macd_signals, name='MACD')
     # tm.draw_price_chart(data, sar_signals)
 
     exit()
