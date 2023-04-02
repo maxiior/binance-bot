@@ -4,8 +4,8 @@ import math
 import numpy as np
 
 class TechnicalAnalyst():
-    def __init__(self):
-        pass
+    def __init__(self, prices):
+        self.prices = prices 
 
     def check_if_exceeded_stop_loss(self, price, bought_for, threshold=0.03):
         if price < bought_for*(1.00-threshold):
@@ -51,17 +51,17 @@ class TechnicalAnalyst():
         area = []
         signals = []
 
-        for idx, i in enumerate(data):
+        for idx, (i, j) in enumerate(zip(data, self.prices)):
             area.append('down' if i < 30 else 'top' if i > 70 else 'middle')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'down' and area[idx] == 'middle' and last != 1:
                 signals.append(1)
-                bought_for = i
+                bought_for = j
             elif area[idx-1] == 'top' and area[idx] == 'middle' and last != 2:
                 signals.append(2)
             else:
-                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                if self.check_if_exceeded_stop_loss(j, bought_for, threshold=threshold) and last != 2 and stoploss:
                     signals.append(2)
                 else:
                     signals.append(0)
@@ -72,17 +72,17 @@ class TechnicalAnalyst():
         bought_for = 0
         area = []
         signals = []
-        for idx, i in enumerate(data):
+        for idx, (i, j) in enumerate(zip(data, self.prices)):
             area.append('down' if i < 0 else 'top')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
                 signals.append(1)
-                bought_for = i
+                bought_for = j
             elif area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
                 signals.append(2)
             else:
-                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                if self.check_if_exceeded_stop_loss(j, bought_for, threshold=threshold) and last != 2 and stoploss:
                     signals.append(2)
                 else:
                     signals.append(0)
@@ -93,17 +93,17 @@ class TechnicalAnalyst():
         bought_for = 0
         area = []
         signals = []
-        for idx, (i, j) in enumerate(zip(ma1, ma2)):
+        for idx, (i, j, p) in enumerate(zip(ma1, ma2, self.prices)):
             area.append('down' if i < j else 'top')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
                 signals.append(1)
-                bought_for = i
+                bought_for = p
             elif area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
                 signals.append(2)
             else:
-                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                if self.check_if_exceeded_stop_loss(p, bought_for, threshold=threshold) and last != 2 and stoploss:
                     signals.append(2)
                 else:
                     signals.append(0)
@@ -114,17 +114,18 @@ class TechnicalAnalyst():
         bought_for = 0
         area = []
         signals = []
-        for idx, i in enumerate(data):
+
+        for idx, (i, j) in enumerate(zip(data, self.prices)):
             area.append('down' if i < -100 else 'top' if i > 100 else 'middle')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'middle' and area[idx] == 'top' and last != 1:
                 signals.append(1)
-                bought_for = i
+                bought_for = j
             elif area[idx-1] == 'middle' and area[idx] == 'down' and last != 2:
                 signals.append(2)
             else:
-                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                if self.check_if_exceeded_stop_loss(j, bought_for, threshold=threshold) and last != 2 and stoploss:
                     signals.append(2)
                 else:
                     signals.append(0)
@@ -134,17 +135,17 @@ class TechnicalAnalyst():
         bought_for = 0
         area = []
         signals = []
-        for idx, i in enumerate(data):
+        for idx, (i, j) in enumerate(zip(data, self.prices)):
             area.append('down' if i < -80 else 'top' if i > -20 else 'middle')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'down' and area[idx] == 'middle' and last != 1:
                 signals.append(1)
-                bought_for = i
+                bought_for = j
             elif area[idx-1] == 'top' and area[idx] == 'middle' and last != 2:
                 signals.append(2)
             else:
-                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                if self.check_if_exceeded_stop_loss(j, bought_for, threshold=threshold) and last != 2 and stoploss:
                     signals.append(2)
                 else:
                     signals.append(0)
@@ -154,17 +155,17 @@ class TechnicalAnalyst():
         bought_for = 0
         area = []
         signals = []
-        for idx, (i, j) in enumerate(zip(k, d)):
+        for idx, (i, j, p) in enumerate(zip(k, d, self.prices)):
             area.append('down' if i <= j else 'top')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if i < 20 and j < 20 and area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
                 signals.append(1)
-                bought_for = i
+                bought_for = p
             elif i > 80 and j > 80 and area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
                 signals.append(2)
             else:
-                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                if self.check_if_exceeded_stop_loss(p, bought_for, threshold=threshold) and last != 2 and stoploss:
                     signals.append(2)
                 else:
                     signals.append(0)
@@ -180,17 +181,17 @@ class TechnicalAnalyst():
         data = data['close'].tolist()
         area = []
         signals = []
-        for idx, (i, j, p, m, a) in enumerate(zip(data, sar, plus_di, minus_di, adx)):
+        for idx, (i, j, p, m, a, pr) in enumerate(zip(data, sar, plus_di, minus_di, adx, self.prices)):
             area.append('down' if i <= j else 'top')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'down' and area[idx] == 'top' and last != 1 and a > 40:   # a to też dodatkowy feature
                 signals.append(1)
-                bought_for = i
+                bought_for = pr
             elif area[idx-1] == 'top' and area[idx] == 'down' and last != 2 and p < m and a > 40:  # to jest dodatkowy feature and p < m
                 signals.append(2)
             else:
-                if self.check_if_exceeded_stop_loss(i, bought_for, threshold=threshold) and stoploss:
+                if self.check_if_exceeded_stop_loss(pr, bought_for, threshold=threshold) and last != 2 and stoploss:
                     signals.append(2)
                 else:
                     signals.append(0)
@@ -220,7 +221,7 @@ class TechnicalAnalyst():
         number_of_transactions = sum(1 if i != 0 else 0 for i in signals)
         score = np.round(((cash/initial_cash)-1)*100, 2)
 
-        return name, np.round(cash,2), np.round(score,2), number_of_transactions, np.round(cash/number_of_transactions,2) if number_of_transactions > 0 else 0
+        return name, np.round(cash,2), np.round(score,2), number_of_transactions, np.round((cash-initial_cash)/number_of_transactions,2) if number_of_transactions > 0 else 0
 
     def draw_price_chart(self, df, signals, column='close'):
         data = df[column].tolist()

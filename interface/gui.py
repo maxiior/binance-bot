@@ -8,34 +8,34 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
 
-def use_heuristics(data, initial_capital):
-    tm = TechnicalAnalyst()
+def use_heuristics(data, initial_capital, stoploss=False, stoploss_threshold=0.03):
+    tm = TechnicalAnalyst(prices=data['close'].tolist())
 
     rsi = tm.get_relative_strength_index(data)
-    rsi_signals = tm.get_RSI_sell_buy_signals(rsi)
+    rsi_signals = tm.get_RSI_sell_buy_signals(rsi, stoploss=stoploss, threshold=stoploss_threshold)
 
     roc = tm.get_rate_of_change(data)
-    roc_signals = tm.get_ROC_sell_buy_signals(roc)
+    roc_signals = tm.get_ROC_sell_buy_signals(roc, stoploss=stoploss, threshold=stoploss_threshold)
 
     cci = tm.get_commodity_channel_index(data)
-    cci_signals = tm.get_CCI_sell_buy_signals(cci)
+    cci_signals = tm.get_CCI_sell_buy_signals(cci, stoploss=stoploss, threshold=stoploss_threshold)
 
     k, d = tm.get_stochastic_oscillator(data)
-    so_signals = tm.get_SO_sell_buy_signals(k, d)
+    so_signals = tm.get_SO_sell_buy_signals(k, d, stoploss=stoploss, threshold=stoploss_threshold)
 
     wo = tm.get_williams_oscillator(data)
-    wo_signals = tm.get_WO_sell_buy_signals(wo)
+    wo_signals = tm.get_WO_sell_buy_signals(wo, stoploss=stoploss, threshold=stoploss_threshold)
 
-    sar_signals = tm.get_SAR_sell_buy_signals(data)
+    sar_signals = tm.get_SAR_sell_buy_signals(data, stoploss=stoploss, threshold=stoploss_threshold)
 
     ma1, ma2 = tm.get_moving_average_crossover(data)
-    mac5_20_signals = tm.get_MAC_sell_buy_signals(ma1, ma2)
+    mac5_20_signals = tm.get_MAC_sell_buy_signals(ma1, ma2, stoploss=stoploss, threshold=stoploss_threshold)
 
     ma1, ma2 = tm.get_moving_average_crossover(data, timeperiod1=10, timeperiod2=50)
-    mac10_50_signals = tm.get_MAC_sell_buy_signals(ma1, ma2)
+    mac10_50_signals = tm.get_MAC_sell_buy_signals(ma1, ma2, stoploss=stoploss, threshold=stoploss_threshold)
 
     macd, macd_signal, _ = tm.get_moving_average_convergence_divergence(data)
-    macd_signals = tm.get_MAC_sell_buy_signals(macd, macd_signal)
+    macd_signals = tm.get_MAC_sell_buy_signals(macd, macd_signal, stoploss=stoploss, threshold=stoploss_threshold)
 
     df = pd.DataFrame(columns=['indicator', 'final capital ($)', 'profit (%)', 'transactions', 'profit/transactions'])
 
@@ -49,7 +49,7 @@ def use_heuristics(data, initial_capital):
     df.loc[len(df)] = tm.calculate_profit(data, mac10_50_signals, name='MAC_10_50', cash=initial_capital)
     df.loc[len(df)] = tm.calculate_profit(data, macd_signals, name='MACD', cash=initial_capital)
 
-    return df, {'rsi': rsi_signals, 'roc': roc_signals, 'cci': cci_signals, 'so': so_signals, 'wo': wo_signals, 'sar': sar_signals, 'mac5_20': mac5_20_signals, 'mac10_50': mac10_50_signals, 'macd': macd_signals}
+    return df, {'rsi': rsi_signals, 'roc': roc_signals, 'cci': cci_signals, 'so': so_signals, 'wo': wo_signals, 'sar': sar_signals, 'mac_5_20': mac5_20_signals, 'mac_10_50': mac10_50_signals, 'macd': macd_signals}
 
 
 
@@ -72,6 +72,12 @@ if __name__ == '__main__':
         initial_capital = st.text_input("Initial capital ($)", value="1000000")
 
 
+    stoploss = st.checkbox('I want to use stop-loss')
+    if stoploss:
+        stoploss_threshold = st.text_input("stop-loss (0-1)", value="0.03")
+    else:
+        stoploss_threshold = 0.03
+
     option = st.selectbox('Select your model', ('Heuristics', 'Optimization', 'Reinforcement Learning'))
 
     if st.button("Invest"):
@@ -83,7 +89,7 @@ if __name__ == '__main__':
             # line_chart = st.line_chart(pd.DataFrame(data['close'].tolist(), columns=[f'{symbol}']))
 
             if option == 'Heuristics':
-                df, signals = use_heuristics(data, float(initial_capital))
+                df, signals = use_heuristics(data, float(initial_capital), stoploss=stoploss, stoploss_threshold=float(stoploss_threshold))
                 df_tmp = df
                 df = df.style.apply(lambda x: ['background-color: #66ff33' if x['profit (%)']>0 else 'background-color: #ff3300' for _ in x], axis=1)
                 st.dataframe(df)
