@@ -7,6 +7,13 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import gym
+import gym_anytrading
+from stable_baselines3.common.vec_env import DummyVecEnv
+from stable_baselines3 import A2C
+from nn import LSTMNet, _2FC
+import torch
+import datetime
 
 def use_heuristics(data, initial_capital, stoploss=False, stoploss_threshold=0.03):
     tm = TechnicalAnalyst(prices=data['close'].tolist())
@@ -51,7 +58,17 @@ def use_heuristics(data, initial_capital, stoploss=False, stoploss_threshold=0.0
 
     return df, {'rsi': rsi_signals, 'roc': roc_signals, 'cci': cci_signals, 'so': so_signals, 'wo': wo_signals, 'sar': sar_signals, 'mac_5_20': mac5_20_signals, 'mac_10_50': mac10_50_signals, 'macd': macd_signals}
 
+def check_if_current_data(file_name):
+    if os.path.isfile(os.path.join("./data", file_name)):
+        mod_time = os.path.getmtime(os.path.join("./data", file_name))
+        mod_date = datetime.datetime.fromtimestamp(mod_time).date()
 
+        if mod_date == datetime.date.today():
+            return True
+        else:
+            return False
+    else:
+        return False
 
 if __name__ == '__main__':
     load_dotenv()
@@ -60,31 +77,49 @@ if __name__ == '__main__':
     client = Client(API_KEY, SECRET_KEY)
     api = API(client)
 
+    rl_model = 'BNB'
+
     st.caption('using binance api')
 
-    col1, col2, col3 = st.columns(3)
+    option = st.selectbox('Select your model', ('Heuristics', 'Optimization', 'Reinforcement Learning', 'Neural Network'))
 
-    with col1:
-        symbol = st.text_input("Set crypto stock symbol (/BUSD)", value="BTC")
-    with col2:
-        time_period = st.text_input("Type a time period (days)", value="180")
-    with col3:
-        initial_capital = st.text_input("Initial capital ($)", value="1000000")
+    if option == 'Heuristics' or option == 'Neural Network':
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            symbol = st.text_input("Set crypto stock symbol (/BUSD)", value="BTC")
+        with col2:
+            time_period = st.text_input("Type a time period (days)", value="180")
+        with col3:
+            initial_capital = st.text_input("Initial capital ($)", value="1000000")
 
 
-    stoploss = st.checkbox('I want to use stop-loss')
-    if stoploss:
-        stoploss_threshold = st.text_input("stop-loss (0-1)", value="0.03")
-    else:
-        stoploss_threshold = 0.03
+        stoploss = st.checkbox('I want to use stop-loss')
+        if stoploss:
+            stoploss_threshold = st.text_input("stop-loss (0-1)", value="0.03")
+        else:
+            stoploss_threshold = 0.03
+    
+    elif option == 'Reinforcement Learning':
+        col1, col2 = st.columns(2)
 
-    option = st.selectbox('Select your model', ('Heuristics', 'Optimization', 'Reinforcement Learning'))
+        with col1:
+            time_period = st.text_input("Type a time period (days)", value="180")
+        with col2:
+            initial_capital = st.text_input("Initial capital ($)", value="1000000")
+
+        files = [i.replace('.zip', '') for i in os.listdir("./models")]
+        symbol = st.radio("Choose trained model:", files)
+
+    
 
     if st.button("Invest"):
         try:
-            data = api.get_historical_klines(f"{symbol}BUSD", client.KLINE_INTERVAL_1DAY, days=int(time_period))
-
-            
+            if check_if_current_data(f"{symbol}.csv"):
+                data = pd.read_csv(f"data/{symbol}.csv")
+            else:
+                data = api.get_historical_klines(f"{symbol}BUSD", client.KLINE_INTERVAL_1DAY, days=int(time_period))
+                data.to_csv(f"data/{symbol}.csv")
 
             # line_chart = st.line_chart(pd.DataFrame(data['close'].tolist(), columns=[f'{symbol}']))
 
@@ -107,9 +142,131 @@ if __name__ == '__main__':
                 ax.plot(df)
                 ax.scatter(x=X, y=y, color=['green' if i == 1 else 'red' for i in c], s=50)
                 st.pyplot(fig)
+
             elif option == 'Optimization':
                 pass
+            elif option == 'Neural Network':
+                model = _2FC(input_size=5)
+                model.load_state_dict(torch.load(f'./nn/model7.pt'))
+
+                X = data['close'].to_list()[:-1]
+                y = data['close'][1:]
+                X2 = []
+
+                for i in range(len(X)):
+                    if i+4 >= len(X):
+                        break
+                    X2 += [[float(X[i]), float(X[i+1]), float(X[i+2]), float(X[i+3]), float(X[i+4])]]
+
+                seq = torch.stack([torch.tensor(i).float() for i in X2])
+                results = []
+
+                with torch.no_grad():
+                    for seq_batch in seq.to('cpu'):
+                        preds = model(seq_batch.unsqueeze(0).to('cpu'))
+                        preds = preds.detach().cpu().numpy()
+                        results.append(preds[0][0])
+
+                capital = float(initial_capital)
+                crypto = 0
+                transactions = 0
+
+                colors = []
+                X_points = []
+                y_points = []
+
+                bought_for = 0
+
+                for idx, (i, j) in enumerate(zip(X[4:], results)):
+                    if j > i and crypto == 0:
+                        crypto = np.round(capital/i, 10)
+                        capital = 0
+                        transactions += 1
+                        colors.append('green')
+                        X_points.append(idx+4)
+                        y_points.append(i)
+                        bought_for = i
+                    elif j < i and crypto != 0:
+                        capital = crypto * i
+                        crypto = 0
+                        transactions += 1
+                        colors.append('red')
+                        X_points.append(idx+4)
+                        y_points.append(i)
+                    if bought_for != 0 and stoploss and crypto != 0:
+                        if 1 - np.round(i/bought_for, 2) > float(stoploss_threshold):
+                            capital = crypto * i
+                            crypto = 0
+                            transactions += 1
+                            colors.append('red')
+                            X_points.append(idx+4)
+                            y_points.append(i)
+
+                if capital == 0:
+                    transactions += 1
+                    capital = crypto * X[-1]
+
+                try:
+                    scores = pd.DataFrame({'final capital': [capital], 'profit (%)': [(100*capital/float(initial_capital))-100], 
+                                        'transactions': [transactions], 'profit/transactions': [(capital - float(initial_capital))/transactions if transactions != 0 else 0]})
+                    st.dataframe(scores)
+                except Exception as e:
+                    print(e)
+            
+                df = pd.DataFrame(data['close'].tolist(), columns=[f'{symbol}'])
+                fig, ax = plt.subplots()
+                ax.plot(df)
+                ax.scatter(x=X_points, y=y_points, color=colors, s=50)
+                st.pyplot(fig)
+
             elif option == 'Reinforcement Learning':
-                pass
+                WINDOW_SIZE = 5
+
+                data.rename(columns={"open time": "Date", "open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}, inplace=True)
+                data['Date'] = pd.to_datetime(data['Date'])
+                data.set_index('Date', inplace=True)
+                try:
+                    data.drop('Unnamed: 0', axis=1, inplace=True)
+                except:
+                    pass
+                data.drop('close time', axis=1, inplace=True)
+                data.drop('quote asset volume', axis=1, inplace=True)
+                data.drop('number of trades', axis=1, inplace=True)
+                data.drop('tb base volume', axis=1, inplace=True)
+                data.drop('tb quote volume', axis=1, inplace=True)
+
+                env = gym.make('stocks-v0', df=data, frame_bound=(WINDOW_SIZE,int(time_period)), window_size=WINDOW_SIZE)
+                obs = env.reset()
+                model = A2C('MlpPolicy', env, verbose=1)
+                model.load(f"models/{rl_model}.zip")
+
+                model_profit = 1
+                random_profit = 1
+
+                while True:
+                    obs = obs[np.newaxis, ...]
+                    action, _states = model.predict(obs)
+                    obs, rewards, done, info = env.step(action)
+                    if done:
+                        model_profit = info['total_profit']
+                        break
+                fig, ax = plt.subplots()
+                plt.cla()
+                env.render_all()
+                st.pyplot(fig)
+
+                env = gym.make('stocks-v0', df=data, frame_bound=(WINDOW_SIZE,int(time_period)), window_size=WINDOW_SIZE)
+                state = env.reset()
+
+                while True:
+                    action = env.action_space.sample()
+                    n_state, rewards, done, info = env.step(action)
+                    if done:
+                        random_profit = info['total_profit']
+                        break
+                
+                df = pd.DataFrame({'random profit': [random_profit], 'model_profit': [model_profit], 'final capital': [np.round(model_profit*float(initial_capital), 2)]})
+                st.dataframe(df)
+                
         except:
             st.error("Something went wrong.")
