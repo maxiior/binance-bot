@@ -46,13 +46,13 @@ class TechnicalAnalyst():
     def get_moving_average_convergence_divergence(self, df, column='close', fastperiod=12, slowperiod=26, signalperiod=9):
         return ta.MACD(df[column], fastperiod=fastperiod, slowperiod=slowperiod, signalperiod=signalperiod)
 
-    def get_RSI_sell_buy_signals(self, data, stoploss=False, threshold=0.03):
+    def get_RSI_sell_buy_signals(self, data, stoploss=False, threshold=0.03, lower_limit=30, upper_limit=70):
         bought_for = 0
         area = []
         signals = []
 
         for idx, (i, j) in enumerate(zip(data, self.prices)):
-            area.append('down' if i < 30 else 'top' if i > 70 else 'middle')
+            area.append('down' if i < lower_limit else 'top' if i > upper_limit else 'middle')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'down' and area[idx] == 'middle' and last != 1:
@@ -61,19 +61,19 @@ class TechnicalAnalyst():
             elif area[idx-1] == 'top' and area[idx] == 'middle' and last != 2:
                 signals.append(2)
             else:
-                if self.check_if_exceeded_stop_loss(j, bought_for, threshold=threshold) and last != 2 and stoploss:
+                if stoploss and self.check_if_exceeded_stop_loss(j, bought_for, threshold=threshold) and last != 2:
                     signals.append(2)
                 else:
                     signals.append(0)
 
         return signals
     
-    def get_ROC_sell_buy_signals(self, data, stoploss=False, threshold=0.03):
+    def get_ROC_sell_buy_signals(self, data, stoploss=False, threshold=0.03, limit=0):
         bought_for = 0
         area = []
         signals = []
         for idx, (i, j) in enumerate(zip(data, self.prices)):
-            area.append('down' if i < 0 else 'top')
+            area.append('down' if i < limit else 'top')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
@@ -110,13 +110,13 @@ class TechnicalAnalyst():
 
         return signals
     
-    def get_CCI_sell_buy_signals(self, data, stoploss=False, threshold=0.03):
+    def get_CCI_sell_buy_signals(self, data, stoploss=False, threshold=0.03, lower_limit=-100, upper_limit=100):
         bought_for = 0
         area = []
         signals = []
 
         for idx, (i, j) in enumerate(zip(data, self.prices)):
-            area.append('down' if i < -100 else 'top' if i > 100 else 'middle')
+            area.append('down' if i < lower_limit else 'top' if i > upper_limit else 'middle')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'middle' and area[idx] == 'top' and last != 1:
@@ -131,12 +131,12 @@ class TechnicalAnalyst():
                     signals.append(0)
         return signals
     
-    def get_WO_sell_buy_signals(self, data, stoploss=False, threshold=0.03):
+    def get_WO_sell_buy_signals(self, data, stoploss=False, threshold=0.03, lower_limit=-80, upper_limit=-20):
         bought_for = 0
         area = []
         signals = []
         for idx, (i, j) in enumerate(zip(data, self.prices)):
-            area.append('down' if i < -80 else 'top' if i > -20 else 'middle')
+            area.append('down' if i < lower_limit else 'top' if i > upper_limit else 'middle')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
             if area[idx-1] == 'down' and area[idx] == 'middle' and last != 1:
@@ -151,18 +151,19 @@ class TechnicalAnalyst():
                     signals.append(0)
         return signals
     
-    def get_SO_sell_buy_signals(self, k, d, stoploss=False, threshold=0.03):
+    def get_SO_sell_buy_signals(self, k, d, stoploss=False, threshold=0.03, lower_limit=20, upper_limit=80):
         bought_for = 0
         area = []
         signals = []
+        
         for idx, (i, j, p) in enumerate(zip(k, d, self.prices)):
             area.append('down' if i <= j else 'top')
             last = next(filter(lambda x: x != 0, reversed(signals)), 0)
 
-            if i < 20 and j < 20 and area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
+            if i < lower_limit and j < lower_limit and area[idx-1] == 'down' and area[idx] == 'top' and last != 1:
                 signals.append(1)
                 bought_for = p
-            elif i > 80 and j > 80 and area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
+            elif i > upper_limit and j > upper_limit and area[idx-1] == 'top' and area[idx] == 'down' and last != 2:
                 signals.append(2)
             else:
                 if self.check_if_exceeded_stop_loss(p, bought_for, threshold=threshold) and last != 2 and stoploss:

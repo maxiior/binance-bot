@@ -11,9 +11,12 @@ import gym
 import gym_anytrading
 from stable_baselines3.common.vec_env import DummyVecEnv
 from stable_baselines3 import A2C
-from nn import LSTMNet, _2FC
+from nn import _2FC
 import torch
 import datetime
+import time
+from sklearn.model_selection import train_test_split
+from optimization import get_oplimalized_signals
 
 def use_heuristics(data, initial_capital, stoploss=False, stoploss_threshold=0.03):
     tm = TechnicalAnalyst(prices=data['close'].tolist())
@@ -44,7 +47,7 @@ def use_heuristics(data, initial_capital, stoploss=False, stoploss_threshold=0.0
     macd, macd_signal, _ = tm.get_moving_average_convergence_divergence(data)
     macd_signals = tm.get_MAC_sell_buy_signals(macd, macd_signal, stoploss=stoploss, threshold=stoploss_threshold)
 
-    df = pd.DataFrame(columns=['indicator', 'final capital ($)', 'profit (%)', 'transactions', 'profit/transactions'])
+    df = pd.DataFrame(columns=['indicator', 'final capital ($)', 'profit (%)', 'transactions', 'profit/transaction'])
 
     df.loc[len(df)] = tm.calculate_profit(data, rsi_signals, name='RSI', cash=initial_capital)
     df.loc[len(df)] = tm.calculate_profit(data, roc_signals, name='ROC', cash=initial_capital)
@@ -83,7 +86,7 @@ if __name__ == '__main__':
 
     option = st.selectbox('Select your model', ('Heuristics', 'Optimization', 'Reinforcement Learning', 'Neural Network'))
 
-    if option == 'Heuristics' or option == 'Neural Network':
+    if option == 'Heuristics' or option == 'Neural Network' or option == 'Optimization':
         col1, col2, col3 = st.columns(3)
 
         with col1:
@@ -99,6 +102,12 @@ if __name__ == '__main__':
             stoploss_threshold = st.text_input("stop-loss (0-1)", value="0.03")
         else:
             stoploss_threshold = 0.03
+
+        if option == 'Optimization':
+            indicator = st.radio("Choose oscillator:", ['RSI', 'ROC', 'CCI', 'SO', 'WO', 'MAC'])
+
+            if indicator == 'MAC':
+                train_size = st.text_input("Set training size (0.01-0.99)", value="0.50")
     
     elif option == 'Reinforcement Learning':
         col1, col2 = st.columns(2)
@@ -115,11 +124,11 @@ if __name__ == '__main__':
 
     if st.button("Invest"):
         try:
-            if check_if_current_data(f"{symbol}.csv"):
-                data = pd.read_csv(f"data/{symbol}.csv")
+            if check_if_current_data(f"{symbol}_{time_period}.csv"):
+                data = pd.read_csv(f"data/{symbol}_{time_period}.csv")
             else:
                 data = api.get_historical_klines(f"{symbol}BUSD", client.KLINE_INTERVAL_1DAY, days=int(time_period))
-                data.to_csv(f"data/{symbol}.csv")
+                data.to_csv(f"data/{symbol}_{time_period}.csv", index=False)
 
             # line_chart = st.line_chart(pd.DataFrame(data['close'].tolist(), columns=[f'{symbol}']))
 
@@ -144,7 +153,43 @@ if __name__ == '__main__':
                 st.pyplot(fig)
 
             elif option == 'Optimization':
-                pass
+                start = time.time()
+
+                if indicator == 'MAC':
+                    len1 = int(len(data)*float(train_size))
+                    train_data, test_data = data[:len1], data[len1:]
+                    signals = get_oplimalized_signals((train_data, test_data), indicator=indicator, stoploss=stoploss, stoploss_threshold=float(stoploss_threshold))
+                else:
+                    signals = get_oplimalized_signals(data, indicator=indicator, stoploss=stoploss, stoploss_threshold=float(stoploss_threshold))
+                
+                stop = time.time()
+                print(stop-start)
+                
+                if indicator == 'MAC':
+                    tm = TechnicalAnalyst(prices=test_data['close'].tolist())
+                    profit = tm.calculate_profit(test_data, signals, name=indicator, cash=float(initial_capital))
+                    result = [(idx, i, signals[idx]) for idx, i in enumerate(test_data['close'].tolist()) if signals[idx] != 0]
+                else:
+                    tm = TechnicalAnalyst(prices=data['close'].tolist())
+                    profit = tm.calculate_profit(data, signals, name=indicator, cash=float(initial_capital))
+                    result = [(idx, i, signals[idx]) for idx, i in enumerate(data['close'].tolist()) if signals[idx] != 0]
+
+                X = [i[0] for i in result]
+                y = [i[1] for i in result]
+                c = [i[2] for i in result]
+
+                st.dataframe(pd.DataFrame({'final capital ($)': [profit[1]], 'profit (%)': [profit[2]], 'transactions': [profit[3]], 'profit/transaction': [profit[4]]}))
+
+                st.header(indicator)
+                if indicator == 'MAC':
+                    df = pd.DataFrame(test_data['close'].tolist(), columns=[f'{symbol}'])
+                else:
+                    df = pd.DataFrame(data['close'].tolist(), columns=[f'{symbol}'])
+                fig, ax = plt.subplots()
+                ax.plot(df)
+                ax.scatter(x=X, y=y, color=['green' if i == 1 else 'red' for i in c], s=50)
+                st.pyplot(fig)
+
             elif option == 'Neural Network':
                 model = _2FC(input_size=5)
                 model.load_state_dict(torch.load(f'./nn/model7.pt'))
@@ -208,7 +253,7 @@ if __name__ == '__main__':
 
                 try:
                     scores = pd.DataFrame({'final capital': [capital], 'profit (%)': [(100*capital/float(initial_capital))-100], 
-                                        'transactions': [transactions], 'profit/transactions': [(capital - float(initial_capital))/transactions if transactions != 0 else 0]})
+                                        'transactions': [transactions], 'profit/transaction': [(capital - float(initial_capital))/transactions if transactions != 0 else 0]})
                     st.dataframe(scores)
                 except Exception as e:
                     print(e)
